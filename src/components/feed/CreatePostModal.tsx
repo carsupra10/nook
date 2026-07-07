@@ -7,6 +7,47 @@ interface CreatePostModalProps {
   user: { name: string; initials: string; accent: string };
 }
 
+// Compress and resize image using Canvas to keep size under 600kb
+const compressImage = (file: File | Blob, maxWidth = 800, maxHeight = 800, quality = 0.6): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(event.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
 export default function CreatePostModal({ onClose, onSubmit, user }: CreatePostModalProps) {
   const [text, setText] = useState('');
   const [localImage, setLocalImage] = useState<string | null>(null);
@@ -16,17 +57,15 @@ export default function CreatePostModal({ onClose, onSubmit, user }: CreatePostM
   const streamRef = useRef<MediaStream | null>(null);
 
   const startCamera = async () => {
-    setIsCameraMode(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+      setIsCameraMode(true);
     } catch (err) {
-      console.error("Camera access denied or unavailable", err);
-      setIsCameraMode(false);
-      alert("Could not access camera");
+      console.error('Error accessing camera:', err);
     }
   };
 
@@ -41,12 +80,29 @@ export default function CreatePostModal({ onClose, onSubmit, user }: CreatePostM
   const takePhoto = () => {
     if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
+    let width = videoRef.current.videoWidth;
+    let height = videoRef.current.videoHeight;
+    const maxWidth = 800;
+    const maxHeight = 800;
+
+    if (width > height) {
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+    } else {
+      if (height > maxHeight) {
+        width = Math.round((width * maxHeight) / height);
+        height = maxHeight;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      ctx.drawImage(videoRef.current, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
       setLocalImage(dataUrl);
       stopCamera();
     }
@@ -58,11 +114,15 @@ export default function CreatePostModal({ onClose, onSubmit, user }: CreatePostM
     };
   }, []);
 
-  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file); // Mock upload for now
-    setLocalImage(url);
+    try {
+      const base64 = await compressImage(file);
+      setLocalImage(base64);
+    } catch (err) {
+      console.error("Error compressing image file:", err);
+    }
   };
 
   const handleSubmit = () => {

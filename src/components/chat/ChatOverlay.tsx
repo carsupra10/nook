@@ -10,6 +10,47 @@ interface ChatOverlayProps {
   onSend: (text: string, imageUrl?: string) => Promise<void>;
 }
 
+// Compress and resize image using Canvas to keep size under 600kb
+const compressImage = (file: File | Blob, maxWidth = 800, maxHeight = 800, quality = 0.6): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(event.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};
+
 export default function ChatOverlay({ chat, messages, currentUserId, onBack, onSend }: ChatOverlayProps) {
   const [input, setInput] = useState('');
   const [pendingImage, setPendingImage] = useState<string | null>(null);
@@ -25,9 +66,14 @@ export default function ChatOverlay({ chat, messages, currentUserId, onBack, onS
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
-    const url = URL.createObjectURL(file); // Mock for now
-    setPendingImage(url);
-    setUploading(false);
+    try {
+      const base64 = await compressImage(file);
+      setPendingImage(base64);
+    } catch (err) {
+      console.error("Error compressing file:", err);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSend = async () => {

@@ -48,16 +48,19 @@ export default function MomentCard({ moment, currentUserId, onLike, onFlame, onS
 
   return (
     <div className="flex flex-col gap-3 py-2 bg-black">
-      {/* Header */}
-      <div className="flex items-center gap-3">
+      {/* Header (Clickable to start chat) */}
+      <div 
+        onClick={() => moment.user.id !== currentUserId && onStartChat(moment.user)}
+        className={`flex items-center gap-3 ${moment.user.id !== currentUserId ? 'cursor-pointer group/header' : ''}`}
+      >
         <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs"
+          className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs transition-transform group-hover/header:scale-105"
           style={{ backgroundColor: moment.user.accent }}
         >
           {moment.user.initials}
         </div>
         <div className="flex items-baseline gap-2">
-          <p className="text-[#f5f5f5] text-[15px] font-bold">{moment.user.name}</p>
+          <p className="text-[#f5f5f5] text-[15px] font-bold group-hover/header:underline decoration-white/20">{moment.user.name}</p>
           <p className="text-[#888888] text-sm">
             {moment.distance} · {moment.time}
           </p>

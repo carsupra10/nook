@@ -76,7 +76,7 @@ export default function CreatePostModal({ onClose, onSubmit, user }: CreatePostM
         
         {isCameraMode ? (
           <div className="w-full h-[60vh] bg-black relative flex flex-col items-center">
-            <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             <button onClick={stopCamera} className="absolute top-4 right-4 p-2 bg-black/50 text-white rounded-full">
               <X size={24} />
             </button>

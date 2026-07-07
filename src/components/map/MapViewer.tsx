@@ -65,7 +65,12 @@ interface MapUser {
   pos: [number, number];
 }
 
-export default function MapViewer() {
+interface MapViewerProps {
+  currentUserId?: string;
+  onStartChat: (user: UserProfile) => void;
+}
+
+export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps) {
   const { profile } = useUser();
   const [locations, setLocations] = useState<MapUser[]>([]);
 
@@ -121,8 +126,16 @@ export default function MapViewer() {
         {locations.map((loc) => (
           <Marker key={loc.id} position={loc.pos} icon={createCustomIcon(loc.user)}>
             <Popup className="custom-popup">
-              <div className="text-[#f5f5f5] font-bold text-sm text-center">
-                {loc.user.name}
+              <div className="flex flex-col items-center gap-2 p-1">
+                <span className="text-white font-bold text-sm">{loc.user.name}</span>
+                {loc.id !== currentUserId && (
+                  <button
+                    onClick={() => onStartChat(loc.user)}
+                    className="px-3 py-1 bg-white text-black text-xs font-bold rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                  >
+                    Chat
+                  </button>
+                )}
               </div>
             </Popup>
           </Marker>

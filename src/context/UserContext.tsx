@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { UserProfile } from '@/types';
 
@@ -23,6 +23,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 1. Listen to Auth State
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
@@ -35,6 +36,32 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return () => unsubAuth();
   }, []);
 
+  // 2. Request Geolocation and Save to Firestore
+  useEffect(() => {
+    if (!firebaseUser) return;
+
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          try {
+            const userRef = doc(db, 'users', firebaseUser.uid);
+            await setDoc(userRef, {
+              pos: [latitude, longitude],
+            }, { merge: true });
+          } catch (e) {
+            console.error('Failed to save geolocation to Firestore:', e);
+          }
+        },
+        (err) => {
+          console.error('Geolocation permission denied or error:', err);
+        },
+        { enableHighAccuracy: true }
+      );
+    }
+  }, [firebaseUser]);
+
+  // 3. Listen to Firestore Profile Document
   useEffect(() => {
     if (!firebaseUser) return;
 

@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useUser } from '@/context/UserContext';
 import { UserProfile } from '@/types';
 
 // Fix for default leaflet icons in Next.js
@@ -20,6 +21,15 @@ if (typeof window !== 'undefined') {
         iconUrl,
         shadowUrl,
     });
+}
+
+// Sub-component to center map dynamically when coordinates change
+function RecenterMap({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, 14);
+  }, [center, map]);
+  return null;
 }
 
 function createCustomIcon(user: UserProfile) {
@@ -56,6 +66,7 @@ interface MapUser {
 }
 
 export default function MapViewer() {
+  const { profile } = useUser();
   const [locations, setLocations] = useState<MapUser[]>([]);
 
   // Subscribe to real-time user locations from Firestore
@@ -85,15 +96,22 @@ export default function MapViewer() {
     return () => unsub();
   }, []);
 
+  // Default fallback center: San Francisco
+  const defaultCenter: [number, number] = [37.7749, -122.4194];
+  const mapCenter = profile?.pos || defaultCenter;
+
   return (
     <div className="w-full h-full relative bg-black">
       <MapContainer
-        center={[37.7749, -122.4194]}
+        center={mapCenter}
         zoom={14}
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%', background: '#000' }}
         zoomControl={false}
       >
+        {/* Recenter the map once user coordinates load */}
+        {profile?.pos && <RecenterMap center={profile.pos} />}
+
         {/* Dark mode tiles */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'

@@ -3,6 +3,7 @@ export interface UserProfile {
   name: string;
   initials: string;
   accent: string;
+  pos?: [number, number];
 }
 
 export interface Moment {

@@ -98,7 +98,7 @@ export default function ChatsPage() {
             // Write message to messages subcollection for existing chat
             await addDoc(collection(db, 'messages'), {
               chatId: existingChat.id,
-              from: 'you',
+              from: profile.id,
               text: initialMessage,
               time: 'Now',
               createdAt: new Date(),
@@ -147,7 +147,7 @@ export default function ChatsPage() {
             if (initialMessage) {
               await addDoc(collection(db, 'messages'), {
                 chatId: newChatDoc.id,
-                from: 'you',
+                from: profile.id,
                 text: initialMessage,
                 time: 'Now',
                 createdAt: new Date(),
@@ -207,7 +207,7 @@ export default function ChatsPage() {
       // Add message doc
       await addDoc(collection(db, 'messages'), {
         chatId: activeChat.id,
-        from: 'you',
+        from: profile.id,
         text: text || '',
         imageUrl: imageUrl || null,
         time: 'Now',
@@ -282,6 +282,7 @@ export default function ChatsPage() {
         <ChatOverlay
           chat={activeChat}
           messages={messages}
+          currentUserId={profile?.id || ''}
           onBack={() => setActiveChat(null)}
           onSend={handleSendMessage}
         />

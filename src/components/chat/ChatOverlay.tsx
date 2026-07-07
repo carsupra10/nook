@@ -5,11 +5,12 @@ import { Chat, Message } from '@/types';
 interface ChatOverlayProps {
   chat: Chat;
   messages: Message[];
+  currentUserId: string;
   onBack: () => void;
   onSend: (text: string, imageUrl?: string) => Promise<void>;
 }
 
-export default function ChatOverlay({ chat, messages, onBack, onSend }: ChatOverlayProps) {
+export default function ChatOverlay({ chat, messages, currentUserId, onBack, onSend }: ChatOverlayProps) {
   const [input, setInput] = useState('');
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -67,30 +68,33 @@ export default function ChatOverlay({ chat, messages, onBack, onSend }: ChatOver
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.from === 'you' ? 'justify-end' : 'justify-start'}`}
-          >
+        {messages.map((msg) => {
+          const isMe = msg.from === currentUserId;
+          return (
             <div
-              className={`max-w-[75%] px-4 py-2.5 ${
-                msg.from === 'you'
-                  ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm'
-                  : 'bg-[#1a1a1a] text-white rounded-2xl rounded-bl-sm border border-white/5'
-              } shadow-sm`}
+              key={msg.id}
+              className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
             >
-              {msg.imageUrl && (
-                <img src={msg.imageUrl} alt="attachment" className="rounded-xl mb-2 max-h-64 object-cover w-full" />
-              )}
-              {msg.text && (
-                <p className="text-[15px] leading-relaxed">{msg.text}</p>
-              )}
-              <p className={`text-[10px] mt-1 text-right ${msg.from === 'you' ? 'text-blue-200' : 'text-gray-500'}`}>
-                {msg.time}
-              </p>
+              <div
+                className={`max-w-[75%] px-4 py-2.5 ${
+                  isMe
+                    ? 'bg-blue-600 text-white rounded-2xl rounded-br-sm'
+                    : 'bg-[#1a1a1a] text-white rounded-2xl rounded-bl-sm border border-white/5'
+                } shadow-sm`}
+              >
+                {msg.imageUrl && (
+                  <img src={msg.imageUrl} alt="attachment" className="rounded-xl mb-2 max-h-64 object-cover w-full" />
+                )}
+                {msg.text && (
+                  <p className="text-[15px] leading-relaxed">{msg.text}</p>
+                )}
+                <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-blue-200' : 'text-gray-500'}`}>
+                  {msg.time}
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         <div ref={messagesEndRef} />
       </div>
 

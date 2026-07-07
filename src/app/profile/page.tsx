@@ -24,7 +24,7 @@ export default function ProfilePage() {
 
   // 1. Fetch user stats from Firestore
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !profile.id) return;
 
     // Fetch moments count
     const qMoments = query(collection(db, 'moments'), where('user.id', '==', profile.id));
@@ -61,7 +61,7 @@ export default function ProfilePage() {
   // Save profile edits
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile || !editName.trim()) return;
+    if (!profile || !profile.id || !editName.trim()) return;
 
     setSaving(true);
     const initials = editName.trim().substring(0, 2).toUpperCase();

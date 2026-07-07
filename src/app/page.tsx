@@ -147,7 +147,7 @@ export default function MomentsPage() {
 
   // Start chat with a user
   const handleStartChat = async (targetUser: UserProfile, initialMessage?: string) => {
-    if (!profile) return;
+    if (!profile || !profile.id) return;
 
     try {
       // Find or create chat in Firestore

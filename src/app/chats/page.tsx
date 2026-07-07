@@ -16,7 +16,7 @@ export default function ChatsPage() {
 
   // 1. Subscribe to active chats from Firestore
   useEffect(() => {
-    if (!profile) return;
+    if (!profile || !profile.id) return;
 
     const q = query(
       collection(db, 'chats'),

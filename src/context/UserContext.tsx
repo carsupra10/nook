@@ -67,7 +67,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const unsubProfile = onSnapshot(doc(db, 'users', firebaseUser.uid), (docSnap) => {
       if (docSnap.exists()) {
-        setProfile(docSnap.data() as UserProfile);
+        const data = docSnap.data();
+        setProfile({
+          id: docSnap.id,
+          name: data.name || 'Anonymous User',
+          initials: data.initials || 'AU',
+          accent: data.accent || '#3b82f6',
+          pos: data.pos,
+        });
       } else {
         // Fallback user profile if not in firestore yet
         setProfile({

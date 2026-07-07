@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useUser } from '@/context/UserContext';
 import { UserProfile } from '@/types';
@@ -76,7 +76,34 @@ export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps
 
   // Subscribe to real-time user locations from Firestore
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'users'), (snapshot) => {
+    if (!profile) return;
+
+    const unsub = onSnapshot(collection(db, 'users'), async (snapshot) => {
+      // Seed mock neighbors in the user's location if only 1 user (the current logged-in user) exists
+      if (snapshot.size <= 1 && profile?.pos) {
+        const [lat, lng] = profile.pos;
+        const mockNeighbors = [
+          { name: 'maya', initials: 'M', accent: '#3b82f6', pos: [lat + 0.003, lng - 0.004] },
+          { name: 'priya', initials: 'P', accent: '#8b5cf6', pos: [lat - 0.003, lng + 0.004] },
+          { name: 'jordan', initials: 'J', accent: '#d97706', pos: [lat + 0.002, lng + 0.002] },
+        ];
+        
+        try {
+          for (const mn of mockNeighbors) {
+            await addDoc(collection(db, 'users'), {
+              name: mn.name,
+              initials: mn.initials,
+              accent: mn.accent,
+              pos: mn.pos,
+              createdAt: new Date(),
+            });
+          }
+        } catch (e) {
+          console.error("Error seeding neighbors:", e);
+        }
+        return;
+      }
+
       const list: MapUser[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
@@ -99,7 +126,7 @@ export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps
     });
 
     return () => unsub();
-  }, []);
+  }, [profile]);
 
   // Default fallback center: San Francisco
   const defaultCenter: [number, number] = [37.7749, -122.4194];
@@ -130,7 +157,11 @@ export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps
                 <span className="text-white font-bold text-sm">{loc.user.name}</span>
                 {loc.id !== currentUserId && (
                   <button
-                    onClick={() => onStartChat(loc.user)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      onStartChat(loc.user);
+                    }}
                     className="px-3 py-1 bg-white text-black text-xs font-bold rounded-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
                   >
                     Chat

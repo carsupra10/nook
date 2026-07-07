@@ -38,4 +38,5 @@ export interface Message {
   text: string;
   time: string;
   imageUrl?: string;
+  createdAt?: any;
 }

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, doc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, doc, addDoc, updateDoc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useUser } from '@/context/UserContext';
 import ChatOverlay from '@/components/chat/ChatOverlay';
-import { Chat, Message } from '@/types';
+import { UserProfile, Chat, Message } from '@/types';
 import { MessageCircle, Flame } from 'lucide-react';
 
 export default function ChatsPage() {
@@ -54,14 +54,125 @@ export default function ChatsPage() {
     return () => unsub();
   }, [profile]);
 
-  // 2. Subscribe to messages of active chat if opened
+  // 2. Check for redirect query parameters to start chat instantly
+  useEffect(() => {
+    if (typeof window === 'undefined' || !profile || !profile.id) return;
+    const params = new URLSearchParams(window.location.search);
+    const targetUserId = params.get('userId');
+    const initialMessage = params.get('msg');
+    if (!targetUserId) return;
+
+    const startChat = async () => {
+      try {
+        const q = query(
+          collection(db, 'chats'),
+          where('members', 'array-contains', profile.id)
+        );
+        const querySnap = await getDocs(q);
+        let existingChat: any = null;
+
+        querySnap.forEach((doc) => {
+          const data = doc.data();
+          if (data.members.includes(targetUserId)) {
+            const otherMemberId = data.members.find((mId: string) => mId !== profile.id);
+            const contactUser = data.profiles[otherMemberId] || {
+              id: otherMemberId,
+              name: 'Contact',
+              initials: 'C',
+              accent: '#737373'
+            };
+            existingChat = {
+              id: doc.id,
+              user: contactUser,
+              lastMessage: data.lastMessage || '',
+              time: data.time || 'Now',
+              streak: data.streak || 0,
+              disappearsIn: data.disappearsIn || 24,
+            };
+          }
+        });
+
+        if (existingChat) {
+          setActiveChat(existingChat);
+          if (initialMessage) {
+            // Write message to messages subcollection for existing chat
+            await addDoc(collection(db, 'messages'), {
+              chatId: existingChat.id,
+              from: 'you',
+              text: initialMessage,
+              time: 'Now',
+              createdAt: new Date(),
+            });
+            await updateDoc(doc(db, 'chats', existingChat.id), {
+              lastMessage: initialMessage,
+              time: 'Just now',
+              createdAt: new Date(),
+            });
+          }
+        } else {
+          // Fetch target user profile first
+          const targetSnap = await getDoc(doc(db, 'users', targetUserId));
+          if (targetSnap.exists()) {
+            const targetData = targetSnap.data();
+            const targetUser: UserProfile = {
+              id: targetSnap.id,
+              name: targetData.name || 'User',
+              initials: targetData.initials || 'U',
+              accent: targetData.accent || '#3b82f6',
+            };
+            
+            // Create chat doc
+            const newChatDoc = await addDoc(collection(db, 'chats'), {
+              members: [profile.id, targetUserId],
+              profiles: {
+                [profile.id]: profile,
+                [targetUserId]: targetUser,
+              },
+              lastMessage: initialMessage || '',
+              time: 'Just now',
+              streak: 1,
+              disappearsIn: 24,
+              createdAt: new Date(),
+            });
+
+            setActiveChat({
+              id: newChatDoc.id,
+              user: targetUser,
+              lastMessage: initialMessage || '',
+              time: 'Just now',
+              streak: 1,
+              disappearsIn: 24,
+            });
+
+            if (initialMessage) {
+              await addDoc(collection(db, 'messages'), {
+                chatId: newChatDoc.id,
+                from: 'you',
+                text: initialMessage,
+                time: 'Now',
+                createdAt: new Date(),
+              });
+            }
+          }
+        }
+        
+        // Clear query parameters from URL without page reload
+        window.history.replaceState({}, '', '/chats');
+      } catch (e) {
+        console.error("Error auto-starting chat:", e);
+      }
+    };
+
+    startChat();
+  }, [profile]);
+
+  // 3. Subscribe to messages of active chat if opened
   useEffect(() => {
     if (!activeChat) return;
 
     const q = query(
       collection(db, 'messages'),
-      where('chatId', '==', activeChat.id),
-      orderBy('createdAt', 'asc')
+      where('chatId', '==', activeChat.id)
     );
 
     const unsub = onSnapshot(q, (snapshot) => {
@@ -74,8 +185,12 @@ export default function ChatsPage() {
           text: data.text || '',
           time: data.time || 'Now',
           imageUrl: data.imageUrl,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date(0)),
         });
       });
+      
+      // Sort client-side to avoid requiring a Firestore composite index
+      list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
       setMessages(list);
     }, (error) => {
       console.error("Error loading chat messages:", error);
@@ -122,7 +237,7 @@ export default function ChatsPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center space-y-3">
           <MessageCircle size={40} className="text-gray-600" />
           <p className="text-gray-400 text-sm">No chats yet.</p>
-          <p className="text-gray-600 text-xs max-w-[200px]">Start a conversation by replying to someone's Moment!</p>
+          <p className="text-gray-600 text-xs max-w-[200px]">Start a conversation by replying to someone's Moment or tapping Chat on the map!</p>
         </div>
       ) : (
         <div className="space-y-3">

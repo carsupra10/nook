@@ -71,7 +71,7 @@ export default function CreatePostModal({ onClose, onSubmit, user }: CreatePostM
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#000000]/90 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in p-4 pb-safe">
+    <div className="fixed inset-0 z-[10000] bg-[#000000]/90 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in p-4 pb-safe">
       <div className="w-full max-w-lg bg-[#1a1a1a] border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-slide-up relative">
         
         {isCameraMode ? (

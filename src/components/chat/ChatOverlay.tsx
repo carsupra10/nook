@@ -39,7 +39,7 @@ export default function ChatOverlay({ chat, messages, onBack, onSend }: ChatOver
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col animate-slide-up">
+    <div className="fixed inset-0 z-[10000] bg-black flex flex-col animate-slide-up">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-12 pb-3 border-b border-white/10 bg-black/80 backdrop-blur-md sticky top-0 z-10">
         <button onClick={onBack} className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors text-white">

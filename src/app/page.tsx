@@ -1,24 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, orderBy, doc, addDoc, updateDoc, arrayUnion, arrayRemove, getDocs, where, serverTimestamp } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import { collection, onSnapshot, query, orderBy, doc, addDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useUser } from '@/context/UserContext';
 import MomentCard from '@/components/feed/MomentCard';
 import CreatePostModal from '@/components/feed/CreatePostModal';
 import StoryViewer from '@/components/feed/StoryViewer';
-import ChatOverlay from '@/components/chat/ChatOverlay';
-import { USERS, INITIAL_MOMENTS } from '@/constants/mockData';
-import { Moment, UserProfile, Chat, Message } from '@/types';
+import { INITIAL_MOMENTS } from '@/constants/mockData';
+import { Moment, UserProfile } from '@/types';
 import { Plus } from 'lucide-react';
 
 export default function MomentsPage() {
   const { profile } = useUser();
+  const router = useRouter();
   const [moments, setMoments] = useState<Moment[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [activeStoryUser, setActiveStoryUser] = useState<UserProfile | null>(null);
-  const [activeChat, setActiveChat] = useState<Chat | null>(null);
-  const [chatMessages, setChatMessages] = useState<Message[]>([]);
 
   // 1. Subscribe to real-time Moments from Firestore
   useEffect(() => {
@@ -51,36 +50,6 @@ export default function MomentsPage() {
 
     return () => unsub();
   }, [profile]);
-
-  // 2. Subscribe to messages of active chat if opened
-  useEffect(() => {
-    if (!activeChat) return;
-
-    const q = query(
-      collection(db, 'messages'),
-      where('chatId', '==', activeChat.id),
-      orderBy('createdAt', 'asc')
-    );
-
-    const unsub = onSnapshot(q, (snapshot) => {
-      const list: Message[] = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        list.push({
-          id: doc.id,
-          from: data.from,
-          text: data.text || '',
-          time: data.time || 'Now',
-          imageUrl: data.imageUrl,
-        });
-      });
-      setChatMessages(list);
-    }, (error) => {
-      console.error("Error loading chat messages:", error);
-    });
-
-    return () => unsub();
-  }, [activeChat]);
 
   // Handle Like Action
   const handleLike = async (id: string) => {
@@ -136,7 +105,7 @@ export default function MomentsPage() {
         flames: 0,
         likedBy: [],
         reactedFlames: [],
-        imageUrl: imageUrl || undefined,
+        imageUrl: imageUrl || null,
         createdAt: new Date(),
       });
       setIsCreating(false);
@@ -145,114 +114,19 @@ export default function MomentsPage() {
     }
   };
 
-  // Start chat with a user
-  const handleStartChat = async (targetUser: UserProfile, initialMessage?: string) => {
+  // Redirect to chats page and start conversation
+  const handleStartChat = (targetUser: UserProfile, initialMessage?: string) => {
     if (!profile || !profile.id) return;
-
-    try {
-      // Find or create chat in Firestore
-      const q = query(
-        collection(db, 'chats'),
-        where('members', 'array-contains', profile.id)
-      );
-      const querySnap = await getDocs(q);
-      
-      let existingChat: Chat | null = null;
-
-      querySnap.forEach((doc) => {
-        const data = doc.data();
-        if (data.members.includes(targetUser.id)) {
-          existingChat = {
-            id: doc.id,
-            user: data.profiles[targetUser.id],
-            lastMessage: data.lastMessage,
-            time: data.time,
-            streak: data.streak || 0,
-            disappearsIn: data.disappearsIn || 24,
-          };
-        }
-      });
-
-      if (existingChat) {
-        setActiveChat(existingChat);
-        if (initialMessage) {
-          await handleSendChatMessage(initialMessage, undefined, existingChat);
-        }
-      } else {
-        // Create new chat doc
-        const newChatDoc = await addDoc(collection(db, 'chats'), {
-          members: [profile.id, targetUser.id],
-          profiles: {
-            [profile.id]: profile,
-            [targetUser.id]: targetUser,
-          },
-          lastMessage: initialMessage || '',
-          time: 'Just now',
-          streak: 1,
-          disappearsIn: 24,
-          createdAt: new Date(),
-        });
-
-        const newChat: Chat = {
-          id: newChatDoc.id,
-          user: targetUser,
-          lastMessage: initialMessage || '',
-          time: 'Just now',
-          streak: 1,
-          disappearsIn: 24,
-        };
-
-        setActiveChat(newChat);
-
-        if (initialMessage) {
-          await addDoc(collection(db, 'messages'), {
-            chatId: newChatDoc.id,
-            from: 'you',
-            text: initialMessage,
-            time: 'Now',
-            createdAt: new Date(),
-          });
-        }
-      }
-    } catch (err) {
-      console.error("Error starting chat:", err);
+    let url = `/chats?userId=${targetUser.id}`;
+    if (initialMessage) {
+      url += `&msg=${encodeURIComponent(initialMessage)}`;
     }
-  };
-
-  // Send message from overlay
-  const handleSendChatMessage = async (text: string, imageUrl?: string, overrideChat?: Chat) => {
-    const active = overrideChat || activeChat;
-    if (!active || !profile) return;
-
-    try {
-      // Add message
-      await addDoc(collection(db, 'messages'), {
-        chatId: active.id,
-        from: 'you',
-        text: text || '',
-        imageUrl: imageUrl || null,
-        time: 'Now',
-        createdAt: new Date(),
-      });
-
-      // Update chat last message
-      const chatDoc = doc(db, 'chats', active.id);
-      await updateDoc(chatDoc, {
-        lastMessage: text || '📷 Photo',
-        time: 'Just now',
-        createdAt: new Date(),
-      });
-    } catch (e) {
-      console.error("Error sending message:", e);
-    }
+    router.push(url);
   };
 
   // Generate stories dynamically by filtering active moments from the last 24h
-  // Group them by user
   const storiesMap: Record<string, { user: UserProfile; moments: Moment[] }> = {};
   moments.forEach((m) => {
-    // Exclude current user from stories if they click the FAB separately, 
-    // but we can still show their moments in feed.
     if (m.user.id !== profile?.id) {
       if (!storiesMap[m.user.id]) {
         storiesMap[m.user.id] = { user: m.user, moments: [] };
@@ -328,16 +202,6 @@ export default function MomentsPage() {
           user={activeStoryUser}
           moments={getMomentsForUser(activeStoryUser)}
           onClose={() => setActiveStoryUser(null)}
-        />
-      )}
-
-      {/* Reply Chat Overlay */}
-      {activeChat && (
-        <ChatOverlay
-          chat={activeChat}
-          messages={chatMessages}
-          onBack={() => setActiveChat(null)}
-          onSend={(text, img) => handleSendChatMessage(text, img)}
         />
       )}
     </div>

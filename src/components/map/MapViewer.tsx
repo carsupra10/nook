@@ -27,7 +27,13 @@ if (typeof window !== 'undefined') {
 function RecenterMap({ center }: { center: [number, number] }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, 14);
+    if (center && map) {
+      try {
+        map.setView(center, map.getZoom() || 14);
+      } catch (e) {
+        console.warn("Leaflet RecenterMap error ignored:", e);
+      }
+    }
   }, [center, map]);
   return null;
 }
@@ -71,7 +77,7 @@ interface MapViewerProps {
 }
 
 export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps) {
-  const { profile } = useUser();
+  const { profile, loading } = useUser();
   const [locations, setLocations] = useState<MapUser[]>([]);
 
   // Subscribe to real-time user locations from Firestore
@@ -102,16 +108,26 @@ export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps
     return () => unsub();
   }, []);
 
+  // Return spinner while user profile loads, ensuring we have a stable map center on mount
+  if (loading || !profile) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-[#000000]">
+        <div className="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   // Determine Map Center: Use precise pos first, fallback to approxPos (IP), then default to SF
   const defaultCenter: [number, number] = [37.7749, -122.4194];
-  const mapCenter = profile?.pos || profile?.approxPos || defaultCenter;
+  const mapCenter = profile.pos || profile.approxPos || defaultCenter;
 
-  const hasGps = !!profile?.pos;
-  const hasApprox = !!profile?.approxPos;
+  const hasGps = !!profile.pos;
+  const hasApprox = !!profile.approxPos;
 
   return (
     <div className="w-full h-full relative bg-black">
       <MapContainer
+        key={profile.id} // Stable key based on user ID to prevent container reuse issues
         center={mapCenter}
         zoom={hasGps ? 14 : 12}
         scrollWheelZoom={true}
@@ -153,7 +169,7 @@ export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps
         {/* Render approximate area circle for current user if they only have IP location */}
         {!hasGps && hasApprox && (
           <Circle
-            center={profile!.approxPos!}
+            center={profile.approxPos!}
             radius={2000}
             pathOptions={{
               color: '#3b82f6',

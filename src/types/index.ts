@@ -4,6 +4,7 @@ export interface UserProfile {
   initials: string;
   accent: string;
   pos?: [number, number];
+  approxPos?: [number, number];
 }
 
 export interface Moment {

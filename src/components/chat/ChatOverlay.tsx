@@ -135,7 +135,7 @@ export default function ChatOverlay({ chat, messages, currentUserId, onBack, onS
                   <p className="text-[15px] leading-relaxed">{msg.text}</p>
                 )}
                 <p className={`text-[10px] mt-1 text-right ${isMe ? 'text-blue-200' : 'text-gray-500'}`}>
-                  {msg.time}
+                  {msg.createdAt ? (msg.createdAt instanceof Date ? msg.createdAt : new Date(msg.createdAt)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
                 </p>
               </div>
             </div>

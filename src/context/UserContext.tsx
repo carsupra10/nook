@@ -38,7 +38,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return () => unsubAuth();
   }, []);
 
-  // Request Location Explicitly
+  // Fetch IP Location
+  const fetchIPLocation = async (): Promise<[number, number]> => {
+    try {
+      const res = await fetch('https://ipapi.co/json/');
+      if (!res.ok) throw new Error('IP api request failed');
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        return [data.latitude, data.longitude];
+      }
+      throw new Error('No coordinates returned');
+    } catch (e) {
+      console.warn('IP-based geolocation failed, falling back to default:', e);
+      // Fallback: Default to San Francisco coords
+      return [37.7749, -122.4194];
+    }
+  };
+
+  // Request Location Explicitly (GPS)
   const requestLocation = async () => {
     if (!firebaseUser) return;
     return new Promise<void>((resolve, reject) => {
@@ -57,11 +74,21 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
               reject(e);
             }
           },
-          (err) => {
-            console.error('Geolocation permission denied or error:', err);
-            reject(err);
+          async (err) => {
+            console.warn('Geolocation permission denied, falling back to IP geolocation...');
+            try {
+              const ipCoords = await fetchIPLocation();
+              const userRef = doc(db, 'users', firebaseUser.uid);
+              await setDoc(userRef, {
+                approxPos: ipCoords,
+              }, { merge: true });
+              resolve();
+            } catch (ipErr) {
+              console.error('IP fallback failed:', ipErr);
+              reject(err);
+            }
           },
-          { enableHighAccuracy: true, timeout: 10000 }
+          { enableHighAccuracy: true, timeout: 8000 }
         );
       } else {
         reject(new Error('Geolocation not supported by browser'));
@@ -69,11 +96,20 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  // 2. Request Geolocation on Login (Automatic try)
+  // 2. Request Geolocation automatically on Login
   useEffect(() => {
     if (!firebaseUser) return;
-    requestLocation().catch(() => {
-      // Ignore automatic error, user can grant manually
+    requestLocation().catch(async () => {
+      // If prompt fails automatically (Safari gesture rule), immediately seed IP geolocation
+      try {
+        const ipCoords = await fetchIPLocation();
+        const userRef = doc(db, 'users', firebaseUser.uid);
+        await setDoc(userRef, {
+          approxPos: ipCoords,
+        }, { merge: true });
+      } catch (e) {
+        console.error('Error auto-seeding IP location:', e);
+      }
     });
   }, [firebaseUser]);
 
@@ -90,6 +126,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           initials: data.initials || 'AU',
           accent: data.accent || '#3b82f6',
           pos: data.pos,
+          approxPos: data.approxPos,
         });
       } else {
         // Fallback user profile if not in firestore yet

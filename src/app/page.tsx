@@ -12,6 +12,22 @@ import { INITIAL_MOMENTS } from '@/constants/mockData';
 import { Moment, UserProfile } from '@/types';
 import { Plus } from 'lucide-react';
 
+const formatMomentTime = (date: any): string => {
+  if (!date) return 'Just now';
+  const d = date instanceof Date ? date : (date?.toDate ? date.toDate() : new Date(date));
+  if (isNaN(d.getTime())) return 'Just now';
+  
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHrs = Math.floor(diffMs / 3600000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+};
+
 export default function MomentsPage() {
   const { profile } = useUser();
   const router = useRouter();
@@ -30,8 +46,8 @@ export default function MomentsPage() {
         list.push({
           id: doc.id,
           user: data.user,
-          time: data.time || '1h ago',
-          distance: data.distance || '0.5 mi',
+          time: formatMomentTime(data.createdAt),
+          distance: data.distance || '0.1 mi',
           disappearsIn: data.disappearsIn || 24,
           caption: data.caption || '',
           comments: data.comments || 0,

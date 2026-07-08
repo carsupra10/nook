@@ -19,9 +19,10 @@ export default function MomentCard({ moment, currentUserId, onLike, onFlame, onS
   let iconClass = 'text-blue-400';
   let placeholderText = 'say something about the coffee...';
 
-  // Support base64 image or predefined icons
-  const isBase64Image = moment.imageUrl?.startsWith('data:image');
-
+  // Predefined mockup icons vs real images
+  const hasImage = !!moment.imageUrl;
+  const isMockupIcon = moment.imageUrl === 'mountain' || moment.imageUrl === 'flame';
+  
   if (moment.imageUrl === 'mountain') {
     Icon = Mountain;
     bgClass = 'bg-[#2e1065]'; // dark purple
@@ -32,7 +33,7 @@ export default function MomentCard({ moment, currentUserId, onLike, onFlame, onS
     bgClass = 'bg-[#451a03]'; // dark brown/orange
     iconClass = 'text-orange-400';
     placeholderText = 'offer to save the pasta';
-  } else if (isBase64Image) {
+  } else if (hasImage) {
     placeholderText = 'reply to this moment...';
   }
 
@@ -67,18 +68,20 @@ export default function MomentCard({ moment, currentUserId, onLike, onFlame, onS
         </div>
       </div>
 
-      {/* Media Box */}
-      <div className={`relative w-full h-64 rounded-2xl flex items-center justify-center overflow-hidden ${bgClass}`}>
-        <div className="absolute top-4 right-4 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md z-10">
-          <span className={`text-xs font-semibold ${iconClass}`}>disappears in {moment.disappearsIn}h</span>
+      {/* Media Box (Only render if moment has an image or is a mockup icon) */}
+      {hasImage && (
+        <div className={`relative w-full h-64 rounded-2xl flex items-center justify-center overflow-hidden ${bgClass}`}>
+          <div className="absolute top-4 right-4 bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-md z-10">
+            <span className={`text-xs font-semibold ${iconClass}`}>disappears in {moment.disappearsIn}h</span>
+          </div>
+          
+          {!isMockupIcon ? (
+            <img src={moment.imageUrl!} alt="moment" className="w-full h-full object-cover" />
+          ) : (
+            <Icon size={48} className={iconClass} strokeWidth={2.5} />
+          )}
         </div>
-        
-        {isBase64Image ? (
-          <img src={moment.imageUrl} alt="moment" className="w-full h-full object-cover" />
-        ) : (
-          <Icon size={48} className={iconClass} strokeWidth={2.5} />
-        )}
-      </div>
+      )}
 
       {/* Caption */}
       <div className="text-[#f5f5f5] text-[15px] font-bold px-1">

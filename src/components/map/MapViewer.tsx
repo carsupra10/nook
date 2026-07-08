@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { collection, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useUser } from '@/context/UserContext';
 import { UserProfile } from '@/types';
@@ -76,37 +76,11 @@ export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps
 
   // Subscribe to real-time user locations from Firestore
   useEffect(() => {
-    if (!profile) return;
-
-    const unsub = onSnapshot(collection(db, 'users'), async (snapshot) => {
-      // Seed mock neighbors in the user's location if only 1 user (the current logged-in user) exists
-      if (snapshot.size <= 1 && profile?.pos) {
-        const [lat, lng] = profile.pos;
-        const mockNeighbors = [
-          { name: 'maya', initials: 'M', accent: '#3b82f6', pos: [lat + 0.003, lng - 0.004] },
-          { name: 'priya', initials: 'P', accent: '#8b5cf6', pos: [lat - 0.003, lng + 0.004] },
-          { name: 'jordan', initials: 'J', accent: '#d97706', pos: [lat + 0.002, lng + 0.002] },
-        ];
-        
-        try {
-          for (const mn of mockNeighbors) {
-            await addDoc(collection(db, 'users'), {
-              name: mn.name,
-              initials: mn.initials,
-              accent: mn.accent,
-              pos: mn.pos,
-              createdAt: new Date(),
-            });
-          }
-        } catch (e) {
-          console.error("Error seeding neighbors:", e);
-        }
-        return;
-      }
-
+    const unsub = onSnapshot(collection(db, 'users'), (snapshot) => {
       const list: MapUser[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data();
+        // Only render users with precise GPS coordinates
         if (data.pos && Array.isArray(data.pos) && data.pos.length === 2) {
           list.push({
             id: doc.id,
@@ -126,30 +100,34 @@ export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps
     });
 
     return () => unsub();
-  }, [profile]);
+  }, []);
 
-  // Default fallback center: San Francisco
+  // Determine Map Center: Use precise pos first, fallback to approxPos (IP), then default to SF
   const defaultCenter: [number, number] = [37.7749, -122.4194];
-  const mapCenter = profile?.pos || defaultCenter;
+  const mapCenter = profile?.pos || profile?.approxPos || defaultCenter;
+
+  const hasGps = !!profile?.pos;
+  const hasApprox = !!profile?.approxPos;
 
   return (
     <div className="w-full h-full relative bg-black">
       <MapContainer
         center={mapCenter}
-        zoom={14}
+        zoom={hasGps ? 14 : 12}
         scrollWheelZoom={true}
         style={{ height: '100%', width: '100%', background: '#000' }}
         zoomControl={false}
       >
         {/* Recenter the map once user coordinates load */}
-        {profile?.pos && <RecenterMap center={profile.pos} />}
+        {mapCenter && <RecenterMap center={mapCenter} />}
 
         {/* Dark mode tiles */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
-        
+
+        {/* Render precise pins for all users who shared GPS */}
         {locations.map((loc) => (
           <Marker key={loc.id} position={loc.pos} icon={createCustomIcon(loc.user)}>
             <Popup className="custom-popup">
@@ -171,6 +149,21 @@ export default function MapViewer({ currentUserId, onStartChat }: MapViewerProps
             </Popup>
           </Marker>
         ))}
+
+        {/* Render approximate area circle for current user if they only have IP location */}
+        {!hasGps && hasApprox && (
+          <Circle
+            center={profile!.approxPos!}
+            radius={2000}
+            pathOptions={{
+              color: '#3b82f6',
+              fillColor: '#3b82f6',
+              fillOpacity: 0.15,
+              weight: 1.5,
+              dashArray: '5, 10'
+            }}
+          />
+        )}
       </MapContainer>
       
       <style jsx global>{`

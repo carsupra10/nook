@@ -8,6 +8,24 @@ import ChatOverlay from '@/components/chat/ChatOverlay';
 import { UserProfile, Chat, Message } from '@/types';
 import { MessageCircle, Flame } from 'lucide-react';
 
+const formatChatTime = (date: any): string => {
+  if (!date) return 'Just now';
+  const d = date instanceof Date ? date : (date?.toDate ? date.toDate() : new Date(date));
+  if (isNaN(d.getTime())) return 'Just now';
+  
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - d.getTime());
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0 && now.getDate() === d.getDate()) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } else if (diffDays === 1 || (diffDays === 0 && now.getDate() !== d.getDate())) {
+    return 'Yesterday';
+  } else {
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  }
+};
+
 export default function ChatsPage() {
   const { profile } = useUser();
   const [chats, setChats] = useState<Chat[]>([]);
@@ -41,7 +59,7 @@ export default function ChatsPage() {
           id: doc.id,
           user: contactUser,
           lastMessage: data.lastMessage || '',
-          time: data.time || 'Now',
+          time: formatChatTime(data.createdAt),
           streak: data.streak || 0,
           disappearsIn: data.disappearsIn || 24,
         });

@@ -10,7 +10,7 @@ import { auth } from '@/lib/firebase';
 const ACCENTS = ['#3b82f6', '#8b5cf6', '#d97706', '#10b981', '#ec4899', '#f43f5e'];
 
 export default function ProfilePage() {
-  const { profile } = useUser();
+  const { profile, requestLocation } = useUser();
   const [momentsCount, setMomentsCount] = useState(0);
   const [chatsCount, setChatsCount] = useState(0);
   const [streaksCount, setStreaksCount] = useState(0);
@@ -169,6 +169,24 @@ export default function ProfilePage() {
 
       <div className="space-y-3 pt-4">
         <h3 className="text-gray-400 text-xs font-semibold uppercase tracking-widest pl-1">Settings</h3>
+        <button
+          onClick={async () => {
+            try {
+              await requestLocation();
+              alert("Precise GPS location successfully shared!");
+            } catch (e) {
+              alert("Could not enable GPS location. Please check browser permissions.");
+            }
+          }}
+          className="w-full flex items-center justify-between rounded-2xl bg-[#161616] border border-white/5 px-5 py-4 text-white hover:bg-white/5 transition-all group cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <MapPin size={20} className="text-gray-400 group-hover:text-white transition-colors" />
+            <span className="font-medium text-[15px]">
+              {profile.pos ? "📍 GPS Location Access: Allowed" : "📍 Enable Precise GPS Access"}
+            </span>
+          </div>
+        </button>
         <button
           onClick={handleOpenEdit}
           className="w-full flex items-center justify-between rounded-2xl bg-[#161616] border border-white/5 px-5 py-4 text-white hover:bg-white/5 transition-all group cursor-pointer"

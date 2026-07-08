@@ -96,9 +96,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  // 2. Request Geolocation automatically on Login
+  // 2. Request Geolocation automatically on Login and Update Activity
   useEffect(() => {
     if (!firebaseUser) return;
+
+    // Update active status
+    const updateActivity = async () => {
+      try {
+        await setDoc(doc(db, 'users', firebaseUser.uid), {
+          lastActive: new Date(),
+        }, { merge: true });
+      } catch (e) {
+        console.error('Failed to update user activity:', e);
+      }
+    };
+    
+    updateActivity();
+
     requestLocation().catch(async () => {
       // If prompt fails automatically (Safari gesture rule), immediately seed IP geolocation
       try {
@@ -127,6 +141,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           accent: data.accent || '#3b82f6',
           pos: data.pos,
           approxPos: data.approxPos,
+          lastActive: data.lastActive,
         });
       } else {
         // Fallback user profile if not in firestore yet

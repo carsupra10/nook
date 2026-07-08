@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { Heart, Flame, Coffee, Mountain, Flame as FlameIcon, Send } from 'lucide-react';
 import { Moment, UserProfile } from '@/types';
@@ -8,9 +10,10 @@ interface MomentCardProps {
   onLike: (id: string) => void;
   onFlame: (id: string) => void;
   onStartChat: (user: UserProfile, initialMessage?: string) => void;
+  onVote: (momentId: string, optionIdx: number) => void;
 }
 
-export default function MomentCard({ moment, currentUserId, onLike, onFlame, onStartChat }: MomentCardProps) {
+export default function MomentCard({ moment, currentUserId, onLike, onFlame, onStartChat, onVote }: MomentCardProps) {
   const [replyText, setReplyText] = useState('');
 
   // Map imageUrl to icon and colors
@@ -47,21 +50,30 @@ export default function MomentCard({ moment, currentUserId, onLike, onFlame, onS
     setReplyText('');
   };
 
+  const isAnon = !!moment.isAnonymous;
+
   return (
-    <div className="flex flex-col gap-3 py-2 bg-black">
-      {/* Header (Clickable to start chat) */}
+    <div className={`flex flex-col gap-3 p-4 rounded-3xl transition-all ${
+      isAnon 
+        ? 'bg-[#0e091b] border border-purple-500/20 shadow-[0_0_20px_rgba(139,92,246,0.08)]' 
+        : 'bg-[#000000] border border-white/5'
+    }`}>
+      
+      {/* Header (Clickable to start chat only if not anonymous) */}
       <div 
-        onClick={() => moment.user.id !== currentUserId && onStartChat(moment.user)}
-        className={`flex items-center gap-3 ${moment.user.id !== currentUserId ? 'cursor-pointer group/header' : ''}`}
+        onClick={() => !isAnon && moment.user.id !== currentUserId && onStartChat(moment.user)}
+        className={`flex items-center gap-3 ${(!isAnon && moment.user.id !== currentUserId) ? 'cursor-pointer group/header' : ''}`}
       >
         <div
-          className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs transition-transform group-hover/header:scale-105"
-          style={{ backgroundColor: moment.user.accent }}
+          className="w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs transition-transform"
+          style={{ backgroundColor: isAnon ? '#5b21b6' : moment.user.accent }}
         >
-          {moment.user.initials}
+          {isAnon ? '🕵️' : moment.user.initials}
         </div>
         <div className="flex items-baseline gap-2">
-          <p className="text-[#f5f5f5] text-[15px] font-bold group-hover/header:underline decoration-white/20">{moment.user.name}</p>
+          <p className="text-[#f5f5f5] text-[15px] font-bold group-hover/header:underline decoration-white/20">
+            {isAnon ? 'Anonymous Confession' : moment.user.name}
+          </p>
           <p className="text-[#888888] text-sm">
             {moment.distance} · {moment.time}
           </p>
@@ -83,8 +95,57 @@ export default function MomentCard({ moment, currentUserId, onLike, onFlame, onS
         </div>
       )}
 
+      {/* Poll Component */}
+      {moment.poll && (
+        <div className="mt-1 p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3">
+          <p className="text-white font-semibold text-[15px]">{moment.poll.question}</p>
+          <div className="space-y-2">
+            {moment.poll.options.map((opt, idx) => {
+              const totalVotes = moment.poll!.options.reduce((acc, o) => acc + (o.votes?.length || 0), 0);
+              const optVotes = opt.votes?.length || 0;
+              const percent = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+              const hasVoted = currentUserId ? moment.poll!.options.some(o => o.votes?.includes(currentUserId)) : false;
+              const votedForThis = currentUserId ? opt.votes?.includes(currentUserId) : false;
+
+              return (
+                <button
+                  key={idx}
+                  disabled={!currentUserId || hasVoted}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onVote(moment.id, idx);
+                  }}
+                  className={`w-full relative overflow-hidden rounded-xl border p-3 flex items-center justify-between text-left transition-all cursor-pointer ${
+                    votedForThis 
+                      ? 'border-blue-500 bg-blue-500/10' 
+                      : 'border-white/5 bg-white/5 hover:border-white/10'
+                  }`}
+                >
+                  {/* Progress Bar Background fill */}
+                  {hasVoted && (
+                    <div 
+                      className="absolute left-0 top-0 bottom-0 bg-white/10 transition-all duration-500" 
+                      style={{ width: `${percent}%` }}
+                    />
+                  )}
+                  <span className="relative z-10 text-sm text-white font-medium flex items-center gap-2">
+                    {opt.text}
+                    {votedForThis && <span className="text-blue-400">✓</span>}
+                  </span>
+                  {hasVoted && (
+                    <span className="relative z-10 text-xs font-bold text-gray-400">
+                      {percent}% ({optVotes})
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Caption */}
-      <div className="text-[#f5f5f5] text-[15px] font-bold px-1">
+      <div className="text-[#f5f5f5] text-[15px] font-bold px-1 mt-1">
         {moment.caption}
       </div>
 
@@ -119,12 +180,13 @@ export default function MomentCard({ moment, currentUserId, onLike, onFlame, onS
             className="flex-1 bg-transparent text-sm text-[#f5f5f5] placeholder-[#737373] outline-none"
           />
           {replyText.trim() && (
-            <button type="submit" className="text-white hover:scale-105 active:scale-95 transition-all">
+            <button type="submit" className="text-white hover:scale-105 active:scale-95 transition-all cursor-pointer">
               <Send size={14} />
             </button>
           )}
         </form>
       </div>
+
     </div>
   );
 }

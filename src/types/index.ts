@@ -5,6 +5,7 @@ export interface UserProfile {
   accent: string;
   pos?: [number, number];
   approxPos?: [number, number];
+  lastActive?: any;
 }
 
 export interface Moment {
@@ -22,6 +23,14 @@ export interface Moment {
   imageUrl?: string;
   likedBy?: string[];
   reactedFlames?: string[];
+  isAnonymous?: boolean;
+  poll?: {
+    question: string;
+    options: {
+      text: string;
+      votes: string[];
+    }[];
+  };
 }
 
 export interface Chat {

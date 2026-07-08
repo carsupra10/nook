@@ -143,8 +143,18 @@ export default function ChatsPage() {
             const newChatDoc = await addDoc(collection(db, 'chats'), {
               members: [profile.id, targetUserId],
               profiles: {
-                [profile.id]: profile,
-                [targetUserId]: targetUser,
+                [profile.id]: {
+                  id: profile.id,
+                  name: profile.name,
+                  initials: profile.initials,
+                  accent: profile.accent,
+                },
+                [targetUserId]: {
+                  id: targetUser.id,
+                  name: targetUser.name,
+                  initials: targetUser.initials,
+                  accent: targetUser.accent,
+                },
               },
               lastMessage: initialMessage || '',
               time: 'Just now',

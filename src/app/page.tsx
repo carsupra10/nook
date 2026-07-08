@@ -8,7 +8,6 @@ import { useUser } from '@/context/UserContext';
 import MomentCard from '@/components/feed/MomentCard';
 import CreatePostModal from '@/components/feed/CreatePostModal';
 import StoryViewer from '@/components/feed/StoryViewer';
-import { INITIAL_MOMENTS } from '@/constants/mockData';
 import { Moment, UserProfile } from '@/types';
 import { Plus } from 'lucide-react';
 
@@ -56,6 +55,8 @@ export default function MomentsPage() {
           likedBy: data.likedBy || [],
           reactedFlames: data.reactedFlames || [],
           imageUrl: data.imageUrl,
+          isAnonymous: data.isAnonymous || false,
+          poll: data.poll || undefined,
           liked: profile ? (data.likedBy || []).includes(profile.id) : false,
         });
       });
@@ -105,13 +106,52 @@ export default function MomentsPage() {
     }
   };
 
+  // Handle Vote Action in Polls
+  const handleVote = async (momentId: string, optionIdx: number) => {
+    if (!profile || !profile.id) return;
+    const momentDoc = doc(db, 'moments', momentId);
+    const m = moments.find(x => x.id === momentId);
+    if (!m || !m.poll) return;
+
+    const updatedOptions = m.poll.options.map((opt, idx) => {
+      if (idx === optionIdx) {
+        const currentVotes = opt.votes || [];
+        if (!currentVotes.includes(profile.id)) {
+          return {
+            ...opt,
+            votes: [...currentVotes, profile.id]
+          };
+        }
+      }
+      return opt;
+    });
+
+    try {
+      await updateDoc(momentDoc, {
+        'poll.options': updatedOptions
+      });
+    } catch (e) {
+      console.error("Error voting:", e);
+    }
+  };
+
   // Create new Moment in Firestore
-  const handleCreatePost = async (text: string, imageUrl?: string) => {
+  const handleCreatePost = async (
+    text: string,
+    imageUrl?: string,
+    isAnonymous?: boolean,
+    poll?: { question: string; options: { text: string; votes: string[] }[] }
+  ) => {
     if (!profile) return;
 
     try {
       await addDoc(collection(db, 'moments'), {
-        user: profile,
+        user: {
+          id: profile.id,
+          name: profile.name,
+          initials: profile.initials,
+          accent: profile.accent,
+        },
         time: 'Just now',
         distance: '0.1 mi',
         disappearsIn: 24,
@@ -122,6 +162,8 @@ export default function MomentsPage() {
         likedBy: [],
         reactedFlames: [],
         imageUrl: imageUrl || null,
+        isAnonymous: !!isAnonymous,
+        poll: poll || null,
         createdAt: new Date(),
       });
       setIsCreating(false);
@@ -143,7 +185,7 @@ export default function MomentsPage() {
   // Generate stories dynamically by filtering active moments from the last 24h
   const storiesMap: Record<string, { user: UserProfile; moments: Moment[] }> = {};
   moments.forEach((m) => {
-    if (m.user.id !== profile?.id) {
+    if (m.user.id !== profile?.id && !m.isAnonymous) {
       if (!storiesMap[m.user.id]) {
         storiesMap[m.user.id] = { user: m.user, moments: [] };
       }
@@ -152,7 +194,7 @@ export default function MomentsPage() {
   });
 
   const getMomentsForUser = (user: UserProfile) => {
-    return moments.filter(m => m.user.id === user.id);
+    return moments.filter(m => m.user.id === user.id && !m.isAnonymous);
   };
 
   return (
@@ -199,6 +241,7 @@ export default function MomentsPage() {
             onLike={handleLike} 
             onFlame={handleFlame}
             onStartChat={handleStartChat}
+            onVote={handleVote}
           />
         ))}
       </div>
